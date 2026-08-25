@@ -1,0 +1,177 @@
+---
+title: "LAB02"
+format: html
+editor: visual
+---
+
+# Tarefa
+
+```{r}
+#| warning: false
+#| message: false
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(ggcal)
+```
+
+```{r}
+processa_chunk <- function(df, pos) {
+  df %>%
+    filter(AIRLINE %in% c("AA", "DL", "UA", "US")) %>%
+    mutate(
+      DATE = as.Date(paste(YEAR, MONTH, DAY, sep = "-")),
+      atrasado = ifelse(ARRIVAL_DELAY > 10, 1, 0)
+    ) %>%
+    filter(!is.na(ARRIVAL_DELAY)) %>%
+    group_by(DATE, AIRLINE) %>%
+    summarise(
+      voos_atrasados = sum(atrasado),
+      voos_totais = n(),
+      .groups = "drop"
+    )
+}
+resultados_parciais <- read_csv_chunked(
+  file = "flights.csv",
+  callback = DataFrameCallback$new(processa_chunk),
+  chunk_size = 100000
+)
+resultados_finais <- resultados_parciais %>%
+  group_by(DATE, AIRLINE) %>%
+  summarise(
+    total_atrasos = sum(voos_atrasados),
+    total_voos = sum(voos_totais),
+    .groups = "drop"
+  ) %>%
+  mutate(percentual_atraso = (total_atrasos / total_voos) * 100)
+
+head(resultados_finais)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| fig-width: 12  
+#| fig-height: 6
+dados_calendario <- resultados_finais %>%
+  filter(!is.na(DATE)) %>% 
+  mutate(
+    mes = as.integer(format(DATE, "%m")),
+    mes_nome = factor(mes, levels = 1:12, labels = month.abb),
+    dia_semana = factor(format(DATE, "%u"), levels = 1:7, 
+                        labels = c("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")),
+    semana_ano = as.numeric(format(DATE, "%W"))
+  ) %>%
+  group_by(mes_nome) %>%
+  mutate(semana_mes = semana_ano - min(semana_ano, na.rm = TRUE) + 1) %>%
+  ungroup()
+ggplot(dados_calendario, aes(x = dia_semana, y = semana_mes, fill = percentual_atraso)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  facet_grid(AIRLINE ~ mes_nome) + 
+  scale_y_reverse() + 
+  scale_fill_gradientn(colors = c("#4575b4", "#ffffbf", "#d73027"),
+                       name = "% Atrasos\n(> 10min)") +
+  labs(
+    title = "Percentual de Voos com Atraso na Chegada (> 10 min) - Ano 2015",
+    subtitle = "Companhias: AA, DL, UA e US",
+    x = "",
+    y = ""
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank(),
+    strip.text.x = element_text(face = "bold", size = 12),
+    strip.text.y = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 90, vjust = 0.5)
+  )
+```
+
+# 1)
+
+Precisamos de apenas dois valores: a contagem de voos com atraso superior a 10 minutos e a contagem total de voos avaliados.
+
+# 2)
+
+```{r}
+getStats <- function(input, pos) {
+  input %>%
+    filter(AIRLINE %in% c("AA", "DL", "UA", "US")) %>%
+    
+    filter(!is.na(ARRIVAL_DELAY)) %>%
+
+    group_by(DAY, MONTH, AIRLINE) %>%
+
+    summarise(
+      voos_atrasados = sum(ARRIVAL_DELAY > 10), 
+      voos_totais = n(),                        
+      .groups = "drop"                          
+    )
+}
+```
+
+# 3)
+
+```{r}
+colunas_selecionadas <- cols_only(
+  MONTH = col_integer(),
+  DAY = col_integer(),
+  AIRLINE = col_character(),
+  ARRIVAL_DELAY = col_double()
+)
+resultados_agrupados <- read_csv_chunked(
+  file = "flights.csv.zip", 
+  callback = DataFrameCallback$new(getStats), 
+  chunk_size = 100000,
+  col_types = colunas_selecionadas
+)
+head(resultados_agrupados)
+```
+
+# 4)
+
+```{r}
+computeStats <- function(df) {
+  df %>%
+    group_by(MONTH, DAY, AIRLINE) %>%
+    summarise(
+      soma_atrasados = sum(voos_atrasados),
+      soma_totais = sum(voos_totais),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Perc = soma_atrasados / soma_totais,
+      Data = as.Date(paste("2015", MONTH, DAY, sep = "-")),
+      Cia = AIRLINE
+    ) %>%
+    select(Cia, Data, Perc)
+}
+```
+
+# 5)
+
+```{r}
+#| warning: false
+#| message: false
+
+pal <- scale_fill_gradient(low = "#4575b4", high = "#d73027", name = "% Atraso")
+
+baseCalendario <- function(stats, cia) {
+  df_cia <- filter(stats, Cia == cia)
+  base <- ggcal(df_cia$Data, df_cia$Perc)
+  return(base)
+}
+
+dados_para_calendario <- computeStats(resultados_agrupados)
+
+cAA <- baseCalendario(dados_para_calendario, "AA")
+cDL <- baseCalendario(dados_para_calendario, "DL")
+cUA <- baseCalendario(dados_para_calendario, "UA")
+cUS <- baseCalendario(dados_para_calendario, "US")
+
+cAA + pal + ggtitle("Calendário de Atrasos - American Airlines (AA)")
+cDL + pal + ggtitle("Calendário de Atrasos - Delta Air Lines (DL)")
+cUA + pal + ggtitle("Calendário de Atrasos - United Airlines (UA)")
+cUS + pal + ggtitle("Calendário de Atrasos - US Airways (US)")
+```
