@@ -164,3 +164,9 @@ WHERE SALARY BETWEEN 500 AND 2000
 SELECT * FROM EMPLOYEE 
 WHERE SALARY < 500 OR SALARY > 2000
 ```
+
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
