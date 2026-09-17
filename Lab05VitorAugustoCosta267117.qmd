@@ -1,0 +1,143 @@
+---
+title: "Lab05VitorAugustoCosta267117"
+format: html
+editor: visual
+---
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(leaflet)
+library(lubridate)
+```
+
+```{r}
+# A funcao criada serve pra manter somente os dados desejados e remove os voos cancelados, 
+#ela é aplicada a cada chunk lido do arquivo
+analisa_aeronave <- function(tail_number, arquivo) {
+  funcao_filtro <- function(pedaco_dados, indice_posicao) {
+    pedaco_dados %>%
+      filter(TAIL_NUMBER == tail_number, CANCELLED == 0)
+  }
+  
+# O read_csv_chunked le tem chunks de 100000 linhas por vez, aplica o filtro anterior e junta 
+#o resultado
+  dados_voos_aeronave <- read_csv_chunked(
+    file = arquivo, 
+    callback = DataFrameCallback$new(funcao_filtro), 
+    chunk_size = 100000,
+    show_col_types = FALSE
+  )  
+# Verifica se a aeronave existe nos dados
+  if (nrow(dados_voos_aeronave) == 0) {
+    stop("Nenhum voo encontrado ou arquivo vazio")
+  }
+
+# Tenta ler o airports.csv na mesma pasta do Quarto Doc
+  diretorio_base <- dirname(arquivo)
+  caminho_aeroportos <- file.path(diretorio_base, "airports.csv")
+  if (!file.exists(caminho_aeroportos)) {
+    stop("O arquivo nao foi encontrado na mesma pasta do arquivo de voos")
+  }
+  dados_aeroportos <- read_csv(caminho_aeroportos, show_col_types = FALSE)  
+  
+# Aqui ocorre um tratamento de data/horarios, formatando a data/hora e entao calcula 
+#a velocidade media em mph do aviao 
+  tabela_trajetos <- dados_voos_aeronave %>%
+    mutate(
+# DEPARTURE_TIME costuma vir como inteiro, entao formata pro certo %%:%%
+      hora_partida_formatada = sprintf("%04d", as.integer(DEPARTURE_TIME)),
+      hora_string = substr(hora_partida_formatada, 1, 2),
+      minuto_string = substr(hora_partida_formatada, 3, 4),
+# Cria um objeto para ordenacao cronologica exata      
+      data_hora_exata = make_datetime(
+        year = YEAR, month = MONTH, day = DAY, 
+        hour = as.integer(hora_string), 
+        min = as.integer(minuto_string)
+      ),
+# A estatistica de interesse é a velocidade media, entao dividimos distancia por tempo em horas, 
+#e como air_time ta em minutos, dividimos por 60
+      velocidade_media_mph = DISTANCE / (AIR_TIME / 60)
+    ) %>%
+    # Ordena de maneira linear e sequencial no tempo
+    arrange(data_hora_exata)
+
+# agora é hora de cruzar os dados das viagens (origem e destino)
+# usando dois joins, um pra pegar a latitude/longitude da origem e outro do destino
+  tabela_trajetos <- tabela_trajetos %>%
+    left_join(
+      dados_aeroportos %>% select(IATA_CODE, LATITUDE, LONGITUDE), 
+      by = c("ORIGIN_AIRPORT" = "IATA_CODE")
+    ) %>%
+    rename(origem_lat = LATITUDE, origem_lon = LONGITUDE) %>%
+    left_join(
+      dados_aeroportos %>% select(IATA_CODE, LATITUDE, LONGITUDE), 
+      by = c("DESTINATION_AIRPORT" = "IATA_CODE")
+    ) %>%
+    rename(destino_lat = LATITUDE, destino_lon = LONGITUDE) %>%
+# remove caso a coordenada do aeroporto esteja ausente
+    drop_na(origem_lat, origem_lon, destino_lat, destino_lon, velocidade_media_mph)
+
+# agora o mapa com leaflet será criado
+  mapa_trajetos <- leaflet() %>% 
+    addProviderTiles(providers$CartoDB.Positron)
+
+  # adiciona marcadores para todos os aeroportos visitados pelo aviao
+  aeroportos_unicos <- bind_rows(
+    tabela_trajetos %>% select(codigo = ORIGIN_AIRPORT, lat = origem_lat, lon = origem_lon),
+    tabela_trajetos %>% select(codigo = DESTINATION_AIRPORT, lat = destino_lat, lon = destino_lon)
+  ) %>% distinct(codigo, .keep_all = TRUE)
+  
+  mapa_trajetos <- mapa_trajetos %>%
+    addCircleMarkers(
+      data = aeroportos_unicos,
+      lat = ~lat, lng = ~lon,
+      radius = 4, color = "#ff5700", stroke = FALSE, fillOpacity = 0.8,
+      label = ~codigo
+    )
+# loop sobre cada voo pra desenhar as linhas, e a espessura da linha 
+# reflete a velocidade média do voo
+  for(linha_atual in 1:nrow(tabela_trajetos)) {
+    voo <- tabela_trajetos[linha_atual, ]
+# popup mostrado ao clicar na linha
+    texto_popup <- paste0(
+      "<b>Voo:</b> ", voo$FLIGHT_NUMBER, "<br>",
+      "<b>Data:</b> ", voo$data_hora_exata, "<br>",
+      "<b>Trajeto:</b> ", voo$ORIGIN_AIRPORT, " -> ", voo$DESTINATION_AIRPORT, "<br>",
+      "<b>Velocidade Média:</b> ", round(voo$velocidade_media_mph, 1), " mph"
+    )
+    mapa_trajetos <- mapa_trajetos %>%
+      addPolylines(
+        lat = c(voo$origem_lat, voo$destino_lat),
+        lng = c(voo$origem_lon, voo$destino_lon),
+# pra linhar nao ficar enorme, a velocidade é normalizada
+        weight = voo$velocidade_media_mph / 100, 
+        color = "#00008b", 
+        opacity = 0.5,
+        popup = texto_popup
+      )
+  }
+# retorna uma lista nomeada 
+  lista_retorno <- list(
+    tabela = tabela_trajetos,
+    mapa = mapa_trajetos
+  )
+  
+  return(lista_retorno)
+}
+
+resultados <- analisa_aeronave(
+  tail_number = "N431WN", 
+  arquivo = "flights.csv"
+)
+View(resultados$tabela)
+resultados$mapa
+```
+
+horario
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
