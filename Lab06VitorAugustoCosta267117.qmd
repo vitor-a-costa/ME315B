@@ -1,0 +1,97 @@
+---
+title: "Lab06VitorAugustoCosta267117"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| message: false
+#| warning: false
+library(DBI)
+library(RSQLite)
+library(dplyr)
+
+path <- getwd()
+fname <- file.path(path, "disco.db")
+
+
+conn <- dbConnect(RSQLite::SQLite(), fname)
+
+
+tabelas <- dbListTables(conn)
+print("Tabelas disponíveis no banco de dados:")
+print(tabelas)
+
+
+colunas_customers <- dbListFields(conn, "customers")
+print("Colunas da tabela customers:")
+print(colunas_customers)
+
+
+query_total_clientes <- "
+  SELECT COUNT(*) AS total_clientes 
+  FROM customers;
+"
+total_clientes <- dbGetQuery(conn, query_total_clientes) %>% as_tibble()
+print(total_clientes)
+
+
+query_total_paises <- "
+  SELECT COUNT(DISTINCT Country) AS total_paises 
+  FROM customers;
+"
+total_paises <- dbGetQuery(conn, query_total_paises) %>% as_tibble()
+print(total_paises)
+
+
+query_clientes_por_pais <- "
+  SELECT Country, COUNT(*) AS qtd_clientes 
+  FROM customers 
+  GROUP BY Country 
+  ORDER BY qtd_clientes DESC;"
+clientes_por_pais <- dbGetQuery(conn, query_clientes_por_pais) %>% as_tibble()
+print(clientes_por_pais)
+
+
+query_top5_paises <- "
+  SELECT Country, COUNT(*) AS qtd_clientes 
+  FROM customers 
+  GROUP BY Country 
+  ORDER BY qtd_clientes DESC 
+  LIMIT 5;
+"
+top5_paises <- dbGetQuery(conn, query_top5_paises) %>% as_tibble()
+print(top5_paises)
+
+query_paises_6_letras <- "
+  SELECT DISTINCT Country 
+  FROM customers 
+  WHERE Country GLOB '??????';
+"
+paises_6_letras <- dbGetQuery(conn, query_paises_6_letras) %>% as_tibble()
+print(paises_6_letras)
+
+
+query_musicas_br <- "
+  SELECT DISTINCT t.Name AS Nome_Musica
+  FROM customers c
+  INNER JOIN invoices i ON c.CustomerId = i.CustomerId
+  INNER JOIN invoice_items ii ON i.InvoiceId = ii.InvoiceId
+  INNER JOIN tracks t ON ii.TrackId = t.TrackId
+  WHERE c.Country = 'Brazil';
+"
+musicas_brasil <- dbGetQuery(conn, query_musicas_br) %>% as_tibble()
+print("Amostra das músicas compradas por brasileiros:")
+print(head(musicas_brasil, 10)) 
+
+dbDisconnect(conn)
+
+
+```
+
+horario
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
