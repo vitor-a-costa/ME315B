@@ -1,0 +1,125 @@
+---
+title: "Lab07VitorAugustoCosta267117"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(DBI)
+library(RSQLite)
+
+# Conectar a base de dados
+conn <- dbConnect(RSQLite::SQLite(), "database.sqlite3")
+```
+
+```{r}
+query_quantos_professores <- "
+  SELECT COUNT(DISTINCT i.id) AS quantidade_professores
+  FROM instructors i
+  JOIN teachings t ON i.id = t.instructor_id
+  JOIN sections s ON t.section_uuid = s.uuid
+  JOIN course_offerings co ON s.course_offering_uuid = co.uuid
+  JOIN subject_memberships sm ON co.uuid = sm.course_offering_uuid
+  JOIN subjects sub ON sm.subject_code = sub.code
+  WHERE sub.abbreviation = 'STAT';
+"
+cat("Quantidade de professores:\n")
+print(dbGetQuery(conn, query_quantos_professores))
+
+query_quem_sao <- "
+  SELECT DISTINCT i.name AS nome_professor
+  FROM instructors i
+  JOIN teachings t ON i.id = t.instructor_id
+  JOIN sections s ON t.section_uuid = s.uuid
+  JOIN course_offerings co ON s.course_offering_uuid = co.uuid
+  JOIN subject_memberships sm ON co.uuid = sm.course_offering_uuid
+  JOIN subjects sub ON sm.subject_code = sub.code
+  WHERE sub.abbreviation = 'STAT'
+  ORDER BY i.name;
+"
+cat("\nLista de professores:\n")
+print(head(dbGetQuery(conn, query_quem_sao), 10))
+```
+
+```{r}
+sql_gpa_cte <- "
+  WITH NotasEstatistica AS (
+    SELECT 
+      i.name AS professor,
+      c.name AS disciplina,
+      (gd.a_count * 4.0 + gd.ab_count * 3.5 + gd.b_count * 3.0 + 
+       gd.bc_count * 2.5 + gd.c_count * 2.0 + gd.d_count * 1.0 + gd.f_count * 0.0) AS pontos_totais,
+      (gd.a_count + gd.ab_count + gd.b_count + gd.bc_count + 
+       gd.c_count + gd.d_count + gd.f_count) AS alunos_avaliados
+    FROM grade_distributions gd
+    JOIN course_offerings co ON gd.course_offering_uuid = co.uuid
+    JOIN courses c ON co.course_uuid = c.uuid
+    JOIN subject_memberships sm ON co.uuid = sm.course_offering_uuid
+    JOIN subjects sub ON sm.subject_code = sub.code
+    JOIN sections s ON co.uuid = s.course_offering_uuid AND gd.section_number = s.number
+    JOIN teachings t ON s.uuid = t.section_uuid
+    JOIN instructors i ON t.instructor_id = i.id
+    WHERE sub.abbreviation = 'STAT'
+  )
+"
+
+# Professor mais difícil 
+query_prof_dificil <- paste0(sql_gpa_cte, "
+  SELECT professor, SUM(pontos_totais) / SUM(alunos_avaliados) AS gpa_medio
+  FROM NotasEstatistica
+  GROUP BY professor
+  HAVING SUM(alunos_avaliados) > 0
+  ORDER BY gpa_medio ASC
+  LIMIT 1;
+")
+cat("\nProfessor mais difícil:\n")
+print(dbGetQuery(conn, query_prof_dificil))
+
+# Professor mais fácil
+query_prof_facil <- paste0(sql_gpa_cte, "
+  SELECT professor, SUM(pontos_totais) / SUM(alunos_avaliados) AS gpa_medio
+  FROM NotasEstatistica
+  GROUP BY professor
+  HAVING SUM(alunos_avaliados) > 0
+  ORDER BY gpa_medio DESC
+  LIMIT 1;
+")
+cat("\nProfessor mais fácil:\n")
+print(dbGetQuery(conn, query_prof_facil))
+
+# Disciplina mais difícil
+query_disc_dificil <- paste0(sql_gpa_cte, "
+  SELECT disciplina, SUM(pontos_totais) / SUM(alunos_avaliados) AS gpa_medio
+  FROM NotasEstatistica
+  GROUP BY disciplina
+  HAVING SUM(alunos_avaliados) > 0
+  ORDER BY gpa_medio ASC
+  LIMIT 1;
+")
+cat("\nDisciplina mais difícil:\n")
+print(dbGetQuery(conn, query_disc_dificil))
+
+# Disciplina mais fácil
+query_disc_facil <- paste0(sql_gpa_cte, "
+  SELECT disciplina, SUM(pontos_totais) / SUM(alunos_avaliados) AS gpa_medio
+  FROM NotasEstatistica
+  GROUP BY disciplina
+  HAVING SUM(alunos_avaliados) > 0
+  ORDER BY gpa_medio DESC
+  LIMIT 1;
+")
+cat("\nDisciplina mais fácil:\n")
+print(dbGetQuery(conn, query_disc_facil))
+```
+
+```{r}
+# Encerrar a ligacao ao banco de dados
+dbDisconnect(conn)
+```
+
+horario
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
