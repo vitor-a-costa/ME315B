@@ -1,0 +1,130 @@
+---
+title: "Lista 06"
+format: pdf
+editor: visual
+---
+
+```{r}
+
+library(DBI)
+library(RSQLite)
+
+# Conecta/Cria o arquivo
+con <- dbConnect(RSQLite::SQLite(), "./me315.sqlite")
+```
+
+### 1. Para cada estado mencionado na tabela PRESERVE, exiba o valor de ACRES da menor área de preservação natural localizada nesse estado.
+
+```{sql connection=con}
+SELECT MIN(ACRES), STATE FROM PRESERVE
+GROUP BY STATE
+
+```
+
+### 2. Não considere nenhuma área de preservação natural que tenha mais de 10.000 acres. Para cada estado mencionado na tabela PRESERVE, exiba o valor de ACRES da maior área de preservação natural localizada nesse estado.
+
+```{sql connection=con}
+SELECT MAX(ACRES), STATE FROM PRESERVE
+WHERE ACRES<10000
+GROUP BY STATE
+```
+
+### 3. Na Tabela resultante anterior, ordene os resultados pelos valores máximos, em ordem decrescente.
+
+```{sql connection=con}
+SELECT MAX(ACRES), STATE FROM PRESERVE
+WHERE ACRES<10000
+GROUP BY STATE
+ORDER BY ACRES DESC
+```
+
+### 4. Exiba o tamanho, em acres, da maior área de preservação natural de cada estado, desde que esse valor seja inferior a 25.000 acres.
+
+```{sql connection=con}
+SELECT MAX(ACRES), STATE FROM PRESERVE
+WHERE ACRES<25000
+GROUP BY STATE
+```
+
+### 5. Para cada estado mencionado na tabela PRESERVE, exiba o número de acres da menor área de preservação do estado, desde que esse número seja inferior a 100 acres.
+
+```{sql connection=con}
+SELECT MIN(ACRES), STATE FROM PRESERVE
+WHERE ACRES<100
+GROUP BY STATE
+
+```
+
+### 6. Considere apenas as áreas de preservação natural com mais de 1.000 acres. Para cada estado, exiba o nome e o tamanho (em acres) da maior área de preservação natural desse estado, desde que esse valor seja inferior a 25.000 acres.
+
+```{sql connection=con}
+SELECT PNAME, MAX(ACRES), STATE FROM PRESERVE
+WHERE ACRES<25000 AND ACRES>1000
+GROUP BY STATE
+
+```
+
+### 7. Exiba o estado e o tamanho total, em acres, das áreas de preservação localizadas nesse estado, desde que o tamanho total seja maior ou igual a 10.000 acres e menor ou igual a 50.000 acres.
+
+```{sql connection=con}
+SELECT STATE, SUM(ACRES) FROM PRESERVE
+GROUP BY STATE
+HAVING SUM(ACRES) BETWEEN 10000 AND 50000
+```
+
+### 8. Determine a quantidade média de acres das áreas de preservação para cada estado e, em seguida, exiba a maior dessas médias.
+
+```{sql connection=con}
+SELECT AVG(ACRES), STATE FROM PRESERVE
+GROUP BY STATE
+ORDER BY ACRES DESC
+```
+
+Os seguintes exercícios utilizam a tabela EMPLOYEE
+
+### 9. Para todos os valores de DNO dos departamentos encontrados na tabela EMPLOYEE, exiba o valor de DNO, seguido pelo salário médio daquele departamento.
+
+```{sql connection=con}
+SELECT DNO, AVG(SALARY) FROM EMPLOYEE
+GROUP BY DNO
+
+```
+
+### 10. Para todos os valores de DNO dos departamentos encontrados na tabela EMPLOYEE, exiba o valor de DNO, seguido pela soma, pelo máximo e pelo mínimo dos salários daquele departamento.
+
+```{sql connection=con}
+SELECT DNO, SUM(SALARY), MAX(SALARY), MIN(SALARY) FROM EMPLOYEE
+GROUP BY DNO 
+```
+
+### 11.Considere todos os departamentos, exceto o Departamento 40. Para esses departamentos, exiba o valor de DNO, seguido pelo número de funcionários que trabalham em cada departamento.
+
+```{sql connection=con}
+SELECT DNO, COUNT(ENO) FROM EMPLOYEE
+WHERE DNO!=40
+GROUP BY DNO
+```
+
+### 12. Para cada departamento, determine o número total de funcionários que trabalham naquele departamento. Suponha que a coluna SALARY contenha dados confidenciais e que alguém possa deduzir essas informações confidenciais examinando o total dos salários de cada departamento. Portanto, decida exibir apenas os departamentos nos quais o número de funcionários seja superior a dois.
+
+```{sql connection=con}
+SELECT DNO, COUNT(ENO), SUM(SALARY) FROM EMPLOYEE 
+GROUP BY DNO
+HAVING COUNT(ENO)>2
+```
+
+### 13. Escreva uma solução que possa ser utilizada para reproduzir a seguinte tabela.
+
+```{sql connection=con}
+SELECT STATE, SUM(ACRES) FROM PRESERVE
+GROUP BY STATE
+UNION ALL
+SELECT 'TOTAL', SUM(ACRES) FROM PRESERVE
+```
+
+horario
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
