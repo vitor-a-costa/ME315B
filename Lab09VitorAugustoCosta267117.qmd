@@ -1,0 +1,120 @@
+---
+title: "Lab09VitorAugustoCosta267117"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(reticulate)
+py_install(c("pandas","plotnine"))
+```
+
+
+## 1 
+```{python}
+import pandas as pd
+from plotnine import (
+    ggplot, aes, geom_point, geom_smooth,
+    facet_wrap, facet_grid, labs,
+    scale_x_continuous, scale_y_continuous,
+    scale_color_brewer, theme_minimal, theme
+)
+from plotnine.data import diamonds
+
+# visualizando primeiras linhas e garantindo a ordem do pior pro melhor
+ordem_cut = ['Fair', 'Good', 'Very Good', 'Premium', 'Ideal']
+
+# D (Melhor) até J (Pior)
+ordem_color = ['D', 'E', 'F', 'G', 'H', 'I', 'J'] 
+
+ordem_clarity = ['I1', 'SI2', 'SI1', 'VS2', 'VS1', 'VVS2', 'VVS1', 'IF']
+
+print(diamonds.head())
+```
+
+## 2
+Demonstra que há uma forte associação entre o peso e seu preço. O preço tende a aumentar conforme o peso porém também a variância dos preços aumenta bastante, indicando que pedras do mesmo peso podem ter valores distintos por causa de outras características qualitativas. O gráfico mostra também que há algumas áreas mais densas de acumulo de pedras, em pesos mais "comerciais" como 0.5, 0.7, 1, e 2 quilates.
+```{python}
+# remoçao de outliers extremos de peso mantendo até 3.0 quilates, onde se concentra >99% dos dados
+df_filtrado = diamonds[diamonds['carat'] <= 3.0]
+
+grafico_2 = (
+    ggplot(df_filtrado, aes(x='carat', y='price'))
+    + geom_point(alpha=0.05, size=0.6, color='#2b5c8f')
+    + geom_smooth(method='lowess', color='#d95f02', size=1.2, se=False) 
+    + labs(
+        title='Relação entre Peso (em Quilates) e Preço de Diamantes',
+        subtitle='Dados filtrados para diamantes de até 3,0 quilates com curva de tendência suavizada',
+        x='Peso do Diamante (carat)',
+        y='Preço em Dólares (USD)'
+    )
+    + theme_minimal()
+    + theme(figure_size=(9, 6))
+)
+
+grafico_2.show()
+```
+
+## 3 
+A estrutura geral, de curva ascendente, se mantém em todos os gráficos, porém a taxa de crescimento e a distribuição dos dados muda bastante entre cada um. Conforme a qualidade do corte aumenta, a curva de preço se torna mais íngreme, porém tende a ter uma maior quantidade de diamantes de peso menor (menos de 1 quilate), enquanto cortes inferiores apresentam maior variedade de pesos. 
+```{python}
+grafico_3 = (
+    ggplot(df_filtrado, aes(x='carat', y='price', color='cut'))
+    + geom_point(alpha=0.05, size=0.5)
+    + geom_smooth(method='lowess', se=False, size=1.1) # Substituído 'gam' por 'lowess'
+    + facet_wrap('~cut', ncol=3)
+    + labs(
+        title='Relação entre Peso e Preço por Qualidade de Corte (Cut)',
+        x='Peso do Diamante (carat)',
+        y='Preço em Dólares (USD)',
+        color='Qualidade do Corte'
+    )
+    + theme_minimal()
+    + theme(
+        figure_size=(11, 7),
+        legend_position='none'
+    )
+)
+
+grafico_3.show()
+```
+## 4
+Poluição e sobrecarga visual nos gráficos, com muitos pontos apertados. Poucas observações em algumas combinações mais raras, por exemplo corte X com cor Y. A relação de peso e preço não é idêntico entre todos os gráficos, embora o preço sempre aumente conforme o peso, varia muito de outras características como cor, clareza e etc.
+```{python}
+from plotnine import (
+    ggplot, aes, geom_point, geom_smooth,
+    facet_grid, scale_color_brewer, labs,
+    theme_minimal, theme, element_text
+)
+
+grafico_4 = (
+    ggplot(df_filtrado, aes(x='carat', y='price', color='clarity'))
+    + geom_point(alpha=0.03, size=0.3)
+    + geom_smooth(method='lm', se=False, size=0.7)
+    + facet_grid('cut ~ color')
+    + scale_color_brewer(type='div', palette='Spectral')
+    + labs(
+        title='Relação Preço vs. Peso por Corte, Cor (D=Melhor, J=Pior) e Clareza',
+        x='Peso do Diamante (carat)',
+        y='Preço em Dólares (USD)',
+        color='Clareza (Clarity)'
+    )
+    + theme_minimal()
+    + theme(
+        figure_size=(14, 10),
+        axis_text_x=element_text(rotation=45, hjust=1),
+        legend_position='bottom'
+    )
+)
+
+grafico_4.show()
+```
+
+horario
+
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
+
